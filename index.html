@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Тренируемся</title>
+  <meta charset="windows-1251" />
+  <style>
+    input[type="number"] {
+      width: 30px;
+    }
+
+    fieldset {
+      width: 360px;
+    }
+
+    table {
+      border-collapse: collapse;
+      outline: 2px solid black;
+    }
+
+    td {
+      min-width: 15px;
+      width: 15px;
+      height: 15px;
+      border: 1px solid black;
+      position: relative;
+      font-family: "Arial";
+      font-size: 13px;
+      line-height: 8px;
+      border: 1px solid #a69da5;
+      text-align: center;
+      vertical-align: middle;
+      overflow: hidden;
+    }
+    .black {
+      background-color: black;
+    }
+     .above:nth-child(5n) {
+       border-bottom: 2px solid gray;
+     }
+    .below + .above {
+      border-top: 2px solid gray;
+    }
+    :not(.s):nth-child(5n) {
+      border-right: 2px solid gray;
+    }
+
+    .s {
+      border: none;
+    }
+
+    .editable {}
+
+    .numbers {
+      background-color: #99d4ac;
+    }
+
+    .ed {
+      position: absolute;
+      width: 150px;
+      height: 14px;
+    }
+
+    .loading {
+      width: 350px;
+      height: 125px;
+      border: 1px solid #eb9417;
+      box-shadow: -3px 3px 5px black;
+      position: absolute;
+      top: -150px;
+      left: 700px;
+      transform-origin: 0 100%;
+      background-color: white;
+    }
+
+    @keyframes in {
+      from {
+        top: -150px;
+        transform: rotate(-20deg);
+      }
+      70% {
+        top: 10px;
+        transform: rotate(-20deg);
+      }
+      to {
+        top: 10px;
+        transform: rotate(0deg);
+      }
+    }
+
+    @keyframes out {
+      from {
+        top: 10px;
+      }
+      30% {
+        top: 10px;
+        transform: rotate(15deg);
+      }
+      to {
+        top: -250px;
+        transform: rotate(15deg);
+      }
+    }
+
+    .loading>div {
+      margin: 10px 0 0 10px;
+    }
+
+    .loading :nth-child(3) {
+      width: 319px;
+      height: 10px;
+      border: 1px solid black;
+    }
+
+    .show {
+      width: 0px;
+      height: 10px;
+      background-color: #35a0e8;
+    }
+
+    .f {
+      width: 360px;
+      font-weight: bold;
+    }
+
+    .f span {
+      font-weight: bold;
+      display: block;
+      margin-bottom: 10px;
+    }
+
+    @media print {
+      .noprint,
+      .header-left-top,
+      .a-right-bottom,
+      .time-right-bottom {
+        display: none;
+      }
+    }
+    #myCanvas {
+      width: 0;
+      height: 0;
+    }
+    .x {
+      border: none;
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      top: -1px;
+      left: -1px;
+    }
+    .x::before, .x::after {
+      top: -10%;
+      left: 45%;
+      display: block;
+      position: absolute;
+      content:'';
+      height: 110%;
+      width: 1px;
+      background-color: black;
+    }
+    .x::before {
+      transform: rotate(45deg);
+    }
+    .x::after {
+      transform: rotate(-45deg);
+    }
+  </style>
+
+</head>
+
+<body>
+  <table id="cross"></table>
+  <form class="noprint">
+    <fieldset class="f">
+      <span>Сгенерировать пустой кроссворд</span>
+      <input type="number" value="10" name="y" />вниз X
+      <input type="number" value="20" name="x" />вправо
+      <input type="submit" value="Генерировать" />
+    </fieldset>
+  </form>
+
+  <button class="noprint" onclick="window.print()">Распечатать кроссворд</button>
+
+
+  <fieldset class="noprint">
+    <span><b>LMB</b> - закрасить/отменить закраску</span><br />
+    <span><b>RMB</b> - поставить/убрать крестик</span><br />
+  </fieldset>
+
+  <canvas id="myCanvas" class="noprint"></canvas>
+  <fieldset class="f noprint">
+    <span>Сгенерировать кроссворд на основе изображения</span>
+    <form name="f">
+      <input type="file" name="uploadfile" size="20">
+      <input type="submit" />
+    </form>
+  </fieldset>
+
+  <div class="loading">
+    <div>
+      <b>Файл: </b>
+      <span class="filename"></span>
+    </div>
+    <div>
+      <b>Статус: </b>
+      <span class="stts"></span>
+    </div>
+    <div>
+      <div class="show"></div>
+    </div>
+  </div>
+
+  <script>
+
+    var canvas = document.getElementById('myCanvas'),
+      context = canvas.getContext('2d'),
+      width, height,
+      table = document.getElementById('cross'),
+      loading = document.querySelector('.loading'),
+      filename = document.querySelector('.filename'),
+      stts = document.querySelector('.stts'),
+      show = document.querySelector('.show'),
+      wdth = show.offsetWidth;
+
+    table.onselectstart = function() {
+      return false;
+    }
+    document.forms.f.onsubmit = function(e) {
+      e.preventDefault();
+      table.innerHTML = '';
+      var ans = this.elements.uploadfile.value.match(/[^\\]+?\..{3}$/i);
+      if (!ans) return;
+
+      showProgressBar();
+      var frm = this;
+
+      setTimeout(function() {
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', '/file', true);
+        var d = new FormData(frm);
+
+        filename.innerHTML = ans;
+        stts.innerHTML = 'Загружаем файл на сервер';
+        xhr.send(d);
+        changeProgressBar();
+
+        //индикатор загрузки файла на сервер
+        xhr.upload.onprogress = function(e) {
+          var length = e.loaded / e.total * 100;
+          show.style.width = length + 'px';
+        }
+        xhr.onload = function(e) {
+          stts.innerHTML = 'Файл загружен на сервер';
+          var xhr1 = new XMLHttpRequest();
+          var imgname = this.responseText;
+          if (imgname.indexOf('image') == -1) {
+            stts.innerHTML = 'Ошибка!';
+            return;
+          }
+
+          console.log("GOTTEN NAME ", imgname);
+          xhr1.open('GET', '/link?imagename=' + imgname, true);
+          xhr1.send();
+          xhr1.onload = function() {
+            stts.innerHTML = 'Получаем ссылку на изображение';
+            wdth = 261;
+            show.style.width = wdth + 'px';
+            if (this.status == 500) stts.innerHTML = 'Ошибка. Попробуйте другое изображение';
+            else loadImage(imgname);
+          }
+          xhr1.onerror = function(){
+            stts.innerHTML = 'Ошибка! Попробуйте другое изображение';
+          }
+        }
+      }, 1500);
+    }
+
+    function showProgressBar(m) {
+      if (!m) {
+        //показать
+        loading.style.animation = 'in 1s ease-out';
+        loading.style.animationFillMode = 'forwards';
+      } else {
+        //убрать
+        loading.style.animation = 'out 1s ease-out';
+        setTimeout(function(){
+          show.style.width = 0 + 'px';
+          wdth = 0;
+        },1500);
+      }
+    }
+
+    function changeProgressBar() {
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', '/progress', true);
+      xhr.send();
+      xhr.onload = function() {
+        if (this.responseText != '7') {
+          switch (this.responseText) {
+            case '2':
+              stts.innerHTML = 'Меняем разрешение';
+              break;
+            case '3':
+            case '5':
+            case '7':
+              stts.innerHTML = 'Скачиваем файл';
+              break;
+            case '4':
+              stts.innerHTML = 'Разбиваем файл на крупные пикселы';
+              break;
+            case '6':
+              stts.innerHTML = 'Делаем изображение чёрно-белым';
+              break;
+          }
+          wdth += 29;
+          show.style.width = wdth + 'px';
+          changeProgressBar();
+        }
+      }
+    }
+
+
+    function loadImage(imgname) {
+      setTimeout(function() {
+        var image = new Image(); // using optional size for image
+        image.onload = drawImageActualSize; // draw when image has loaded
+
+        // load an image of intrinsic size 300x227 in CSS pixels
+        image.src = 'files/' + imgname;
+      }, 1000);
+
+    }
+
+
+    function drawImageActualSize() {
+      // use the intrinsic size of image in CSS pixels for the canvas element
+      width = this.naturalWidth;
+      height = this.naturalHeight;
+
+      canvas.width = this.naturalWidth;
+      canvas.height = this.naturalHeight;
+
+      context.drawImage(this, 0, 0);
+
+      var top = [],
+        left = [];
+
+      countColors(top, left, context);
+      filter(left);
+      filter(top);
+
+      createTable(top.length, left.length, false);
+      fillTable(left, top);
+      showProgressBar('remove');
+    }
+
+    //заполнить таблицу данными
+    function fillTable(left, top) {
+      stts.innerHTML = 'Генерируем кроссворд';
+
+      //получить ячейки для заполнения
+      var topCells = getTopCells();
+      var bottomCells = getBottomCells();
+      var t = 14.5 / topCells.length;
+      var b = 14.5 / bottomCells.length;
+
+      //заполнить ячейки данными
+      //верхние
+      for (var i = 0; i < topCells.length; i++) {
+
+        for (var z = 14, o = top[i].length - 1; o >= 0; z--, o--) {
+          topCells[i][z].innerHTML = top[i][o];
+          topCells[i][z].classList.add('filled1');
+        }
+        wdth += t;
+        show.style.width = wdth + 'px';
+      }
+      //нижние
+      for (var i = 0; i < bottomCells.length; i++) {
+        for (var z = 14, o = left[i].length - 1; o >= 0; z--, o--) {
+          bottomCells[i][z].innerHTML = left[i][o];
+          bottomCells[i][z].classList.add('filled2');
+        }
+        wdth += b;
+        show.style.width = wdth + 'px';
+      }
+      show.style.width = 319 + 'px';
+      removeEmptyCells();
+
+      function removeEmptyCells(){
+        var trs = table.getElementsByTagName('TR');
+        for (var i = 0; i < trs.length; i++) {
+          var filled = trs[i].querySelectorAll('.filled1');
+          if (filled.length == 0) {
+            trs[i].remove();
+            i--;
+          } else break;
+        }
+        trs = table.getElementsByTagName('TR');
+        for (var i= 0; i < 15; i++) {
+          var counter = 0;
+          for (var z = 0; z < trs.length; z++) {
+            if (!trs[z]
+              .children[i]
+              .classList.contains('filled2')) {
+                counter++;
+              }
+          }
+          if (counter == trs.length) {
+            for (var x = 0; x < trs.length; x++) {
+              trs[x].children[i].remove();
+            }
+            i--;
+          } else break;
+        }
+      }
+      function getTopCells() {
+        var arr = [];
+        var rows = table.querySelectorAll('.below');
+
+        for (var i = 15, o = 0; i < rows[0].children.length; i++, o++) {
+          arr.push([]);
+          for (var z = 0; z < 15; z++) {
+            arr[o].push(rows[z].children[i]);
+          }
+        }
+        return arr;
+      }
+
+      function getBottomCells() {
+        var arr = [];
+        var rows = table.querySelectorAll('.above');
+
+        for (var i = 0; i < rows.length; i++) {
+          arr.push([]);
+          for (var z = 0; z < 15; z++) {
+            arr[i].push(rows[i].children[z]);
+          }
+        }
+        return arr;
+      }
+    }
+    //превратить цветА в числА
+    function filter(arr) {
+      stts.innerHMTL = 'Обрезаем пробелы';
+      var counter = 0;
+
+      for (var i = 0; i < arr.length; i++) {
+        var temp = [];
+
+        for (var z = 0; z < arr[i].length; z++) {
+          if (arr[i][z] == 'black') {
+            counter++;
+            if (z + 1 == arr[i].length ||
+              arr[i][z + 1] == 'white') {
+              temp.push(counter);
+              counter = 0;
+            }
+          }
+        }
+        arr[i] = temp;
+        temp = [];
+      }
+
+      //убирает пустые ячейки
+      for (var i = 0; i < arr.length; i++) {
+        if (arr[i].length == 0) arr.shift();
+        i = 0;
+        if (arr[i + 1].length > 0) break;
+      }
+
+      for (var i = arr.length - 1; i > 0; i--) {
+        if (arr[i].length == 0) arr.pop();
+        if (arr[i - 1].length > 0) break;
+      }
+    }
+
+    //посчитать цветА
+    function countColors(top, left, context) {
+      stts.innerHTML = 'Просчитываем клетки изображения';
+      countTop();
+      countLeft();
+
+      function countLeft() {
+        for (var i = 0; i < top[0].length; i++) {
+          left.push([]);
+        }
+        var c = 14.5 / left.length;
+        for (var i = 0; i < top.length; i++) {
+          for (var z = 0; z < top[i].length; z++) {
+            left[z].push(top[i][z]);
+          }
+          wdth += c;
+          show.style.width = wdth + 'px';
+        }
+      }
+
+      function countTop() {
+        var c = 14.5 / (width / 10);
+
+        for (var x = 0, i = 0; x < width; x += 10, i++) {
+          top.push([]);
+
+          for (var y = 0; y < height; y += 10) {
+            var data = context.getImageData(x + 5, y + 5, 1, 1).data;
+
+            if (data[0] > 190 &&
+              data[1] > 190 &&
+              data[2] > 190) {
+              top[i].push('white');
+            } else {
+              top[i].push('black');
+            }
+          }
+          wdth += c;
+          show.style.width = wdth + 'px';
+        }
+      }
+
+
+    }
+    var form = document.forms[0];
+    //создать пустую таблицу
+    form.onsubmit = function(e) {
+      e.preventDefault();
+      table.innerHTML = '';
+      createTable(0, 0, true);
+    }
+    //отредактировать поля с цифрами
+    table.onclick = function(e) {
+      if (e.target.tagName != 'TD') return;
+      if (!e.target.classList.contains('editable')) return;
+
+      var target = e.target;
+
+      var coords = e.target.getBoundingClientRect();
+      var input = document.createElement('textarea');
+      input.className = 'ed';
+      input.style.left = coords.left + window.pageXOffset + 'px';
+      input.style.top = coords.top + window.pageYOffset + 'px';
+      document.body.appendChild(input);
+      input.focus();
+      input.onkeypress = function(e) {
+        if (e.keyCode != 13) return;
+
+        var cells = getCells(target.parentNode.classList.contains('below'), target.classList[2], target.classList[1]);
+
+        var data = clearData(this.value);
+        for (var i = 0, z = 14; i < cells.length; i++, z--) {
+          if (data[i]) cells[z].innerHTML = data[i];
+        }
+        document.body.removeChild(this);
+      }
+      return false;
+    }
+    //действие при клике правой кнопкой мыши
+    table.oncontextmenu = function(e) {
+      if (e.target.tagName != 'TD') return;
+      if (e.target.classList.contains('s')) return;
+      e.preventDefault();
+
+      var children = e.target.children;
+      if (children.length == 0) {
+        var x = document.createElement('div');
+        x.className = 'x';
+        e.target.appendChild(x);
+        x.oncontextmenu = function () {
+          this.remove();
+          return false;
+        }
+      }
+      return false;
+    }
+
+    //действие при клике левой кнопкой мыши
+    table.onmousedown = function(e) {
+      if (e.target.tagName != 'TD') return;
+      if (e.which != 1 || e.target.classList.contains('editable') ||
+        e.target.classList.contains('s')) return;
+
+      if (e.target.classList.contains('black')) {
+        e.target.classList.remove('black');
+      } else {
+        e.target.classList.add('black');
+      }
+    }
+
+    //вернуть массив введённых значений
+    function clearData(data) {
+      var delim = data.match(/[^\d]+/);
+      data = data.split(delim);
+      return data;
+    }
+    //получает нужные ячейки
+    function getCells(b, numberOfCell, numberOfRow) {
+      var cells = [];
+      var n = numberOfCell.match(/\d+[^s]/);
+      var r = numberOfRow.match(/\d+[^r]/);
+
+      if (b) {
+        //получить все строки и в них нужную ячейку
+        var rows = table.querySelectorAll('.below');
+        for (var i = 0; i < rows.length; i++) {
+          var children = rows[i].children;
+          cells.push(children[n]);
+        }
+      } else {
+        //получить строку и все нужные ячейки
+        var rows = table.children;
+        var row = rows[r];
+        for (var i = 0; i < 15; i++) {
+          cells.push(row.children[i]);
+        }
+      }
+      return cells;
+    }
+    //функция создания таблицы
+    function createTable(xAxis, yAxis, editable) {
+
+      var x = xAxis == 0 ? +form.elements.x.value : xAxis;
+      var y = yAxis == 0 ? +form.elements.y.value : yAxis;
+
+      x += 15;
+      y += 15;
+      for (var i = 0; i < y; i++) {
+        var tr = document.createElement('tr');
+
+        for (var o = 0; o < x; o++) {
+          var td = document.createElement('td');
+
+          if (i < 15 && o < 15) {
+            td.className = 's';
+          } else if ((i < 15 && o >= 15) || (i >= 15 && o < 15)) {
+            td.classList.add('numbers');
+            if (editable == true) td.classList.add('editable');
+          }
+
+          td.classList.add(i + 'r');
+          td.classList.add(o + 's');
+
+          tr.appendChild(td);
+        }
+        if (i < 15) tr.classList.add('below');
+        else tr.classList.add('above');
+
+        table.appendChild(tr);
+      }
+    }
+
+    function random(min, max) {
+      return Math.round(Math.random() * (max - min) + min);
+    }
+  </script>
+</body>
+
+</html>

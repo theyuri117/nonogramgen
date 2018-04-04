@@ -1,0 +1,20 @@
+git remote add origin https://github.com/theyuri117/nonogramgen.git
+
+Name Value
+Name NAME Value nonogramgen
+Name NAMESPACE Value openshift
+Name MEMORY_LIMIT Value 512Mi
+Name MEMORY_MONGODB_LIMIT Value 512Mi
+Name VOLUME_CAPACITY Value 1Gi
+Name SOURCE_REPOSITORY_URL Value https://github.com/openshift/nodejs-ex.git
+Name SOURCE_REPOSITORY_REF Value 
+Name CONTEXT_DIR Value
+Name APPLICATION_DOMAIN Value
+Name GITHUB_WEBHOOK_SECRET Value ByQuO1GhrX48pjrBHQotID8iYswbg5TmTiWchdhO
+Name GENERIC_WEBHOOK_SECRET Value Jx1IdXU4RctPBQ54QW2qy4nv7T0PPuxv3F04cPi6
+Name DATABASE_SERVICE_NAME Value mongodb
+Name DATABASE_USER Value userRH5
+Name DATABASE_PASSWORD Value SoIQ7bXQAoD6x5Wq
+Name DATABASE_NAME Value sampledb
+Name DATABASE_ADMIN_PASSWORD Value 112112as
+Name NPM_MIRROR Value 
